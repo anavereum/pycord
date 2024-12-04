@@ -305,6 +305,7 @@ class DiscordWebSocket:
         self._buffer = bytearray()
         self._close_code = None
         self._rate_limiter = GatewayRatelimiter()
+        self._poll_event_lock = asyncio.Lock()
 
     @property
     def open(self):
@@ -608,8 +609,10 @@ class DiscordWebSocket:
         ConnectionClosed
             The websocket connection was terminated for unhandled reasons.
         """
+        await self._poll_event_lock.acquire()
         try:
             msg = await self.socket.receive(timeout=self._max_heartbeat_timeout)
+            self._poll_event_lock.release()
             if msg.type is aiohttp.WSMsgType.TEXT:
                 await self.received_message(msg.data)
             elif msg.type is aiohttp.WSMsgType.BINARY:
